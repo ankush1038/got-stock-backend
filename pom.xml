@@ -9,7 +9,7 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.cg</groupId>
-	<artifactId>gotstock</artifactId>
+	<artifactId>got-stock-backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>gotstock</name>
 	<description>Demo project for Spring Boot</description>
@@ -27,7 +27,7 @@
 		<url/>
 	</scm>
 	<properties>
-		<java.version>21</java.version>
+		<java.version>17</java.version>
 	</properties>
 	<dependencies>
 		<dependency>
