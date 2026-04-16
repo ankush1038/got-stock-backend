@@ -19,5 +19,6 @@ public class GotstockApplication {
 	public RestTemplate restTemplate(){
 		return new RestTemplate();
 	}
+
 }
 

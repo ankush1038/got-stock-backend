@@ -46,8 +46,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())  // Disables CSRF protection as we are using stateless authentication
-                .authorizeRequests(auth -> auth
-                        .requestMatchers("register", "login", "/reset-password", "/forgot-password").permitAll()  // Open access for certain endpoints
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("register", "login", "/reset-password", "/forgot-password", "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html").permitAll()  // Open access for certain endpoints
                         .anyRequest().authenticated())  // All other requests require authentication
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))  // Handle unauthorized access
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));  // Stateless session (no server-side sessions)
