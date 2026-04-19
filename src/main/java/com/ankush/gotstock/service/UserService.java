@@ -112,7 +112,7 @@ public class UserService implements UserInterface {
             return new ResponseEntity<>("User not found", HttpStatus.NOT_FOUND);
         }
 
-        // Validate OTP
+        // Validating OTP
         if (user.getOtp() == null || !user.getOtp().equals(resetPasswordDTO.getOtp())) {
             log.warn("Invalid OTP for email: {}", resetPasswordDTO.getEmail());
             return new ResponseEntity<>("Invalid OTP", HttpStatus.BAD_REQUEST);
