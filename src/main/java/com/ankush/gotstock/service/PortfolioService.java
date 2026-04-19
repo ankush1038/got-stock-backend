@@ -132,7 +132,7 @@ public class PortfolioService {
         // Create response DTO with stock data and portfolio value
         GetStockResponse response = new GetStockResponse();
         response.setList(dtoList);
-        response.setTotalPortfolioValue(totalPortfolioValue);
+        response.setTotalPortfolioValue(totalPortfolioValue.doubleValue());
 
         log.info("Total portfolio value calculated: {}", totalPortfolioValue);
         return new ResponseEntity<>(response, HttpStatus.OK);
