@@ -1,7 +1,6 @@
 package com.ankush.gotstock.controller;
 
 import com.ankush.gotstock.dto.*;
-import com.ankush.gotstock.dto.*;
 import com.ankush.gotstock.service.EmailService;
 import com.ankush.gotstock.service.UserService;
 import jakarta.mail.MessagingException;
@@ -42,7 +41,7 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
-    public ResponseEntity<?>resetPassword(@Valid @RequestBody ChangePasswordDTO changePasswordDTO ){
+    public ResponseEntity<?>changePassword(@Valid @RequestBody ChangePasswordDTO changePasswordDTO ){
         return userService.changePassword(changePasswordDTO );
     }
 

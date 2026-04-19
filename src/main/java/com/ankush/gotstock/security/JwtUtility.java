@@ -74,7 +74,8 @@ public class JwtUtility {
 
         // Check if the token is expired
         final boolean valid = Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY.getBytes())
+                //.setSigningKey(SECRET_KEY.getBytes())
+                .setSigningKey(Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8)))
                 .build()
                 .parseClaimsJws(token)
                 .getBody()

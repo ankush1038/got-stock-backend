@@ -7,7 +7,6 @@ import com.ankush.gotstock.model.User;
 import com.ankush.gotstock.repository.StockAlertRepository;
 import com.ankush.gotstock.repository.StockHoldingRepository;
 import com.ankush.gotstock.repository.UserRepository;
-import jakarta.mail.MessagingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -15,6 +14,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -41,8 +42,9 @@ public class StockAlertService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
         User user = userRepository.findByEmail(email);
+
         if (user == null) {
-            log.error("User not found: {}", user.getUsername());
+            log.error("User not found: {}", email);
             throw new RuntimeException("User not found");
         }
 
@@ -58,116 +60,142 @@ public class StockAlertService {
         log.info("Stock alert created for user: {}, symbol: {}", user.getUsername(), alertDTO.getSymbol());
     }
 
-    // Scheduled task to check all stock alerts every 30 minutes
+    // Scheduled task to check all stock alerts every 5 minutes
     @Scheduled(fixedRate = 300000)
     public void checkStockAlerts() {
         List<User> users = userRepository.findAll();
+
         for (User user : users) {
             List<StockAlert> alerts = stockAlertRepository.findByUser(user);
+
             for (StockAlert alert : alerts) {
                 checkAlertThresholds(alert, user);
             }
         }
     }
 
-    // Check if stock price crosses alert thresholds and send email if necessary
+    // Check thresholds
     private void checkAlertThresholds(StockAlert alert, User user) {
         try {
-         //   Double currentPrice = calculatePortfolioValue(user.getId());
-           Double currentPrice = externalApiService.fetchStockData(alert.getSymbol());
-            boolean sendUpperEmail = currentPrice >= alert.getUpperThreshold() && !alert.isUpperThresholdEmailSent();
-            boolean sendLowerEmail = currentPrice <= alert.getLowerThreshold() && !alert.isLowerThresholdEmailSent();
+
+            BigDecimal currentPrice = BigDecimal.valueOf(
+                    externalApiService.fetchStockData(alert.getSymbol())
+            );
+
+            boolean sendUpperEmail =
+                    currentPrice.compareTo(BigDecimal.valueOf(alert.getUpperThreshold())) >= 0 &&
+                            !alert.isUpperThresholdEmailSent();
+
+            boolean sendLowerEmail =
+                    currentPrice.compareTo(BigDecimal.valueOf(alert.getLowerThreshold())) <= 0 &&
+                            !alert.isLowerThresholdEmailSent();
 
             if (sendUpperEmail) {
                 emailService.sendEmail(
                         user.getEmail(),
                         "Stock Alert: Upper Threshold Reached for " + alert.getSymbol(),
-                        "Dear " + user.getUsername() + ",\n\nThe stock " + alert.getSymbol() + " has reached or exceeded your upper threshold of $" + alert.getUpperThreshold() + ". Current price: $" + String.format("%.2f", currentPrice) + ".\n\nBest regards,\nGotStock Team"
+                        "Dear " + user.getUsername() +
+                                ",\n\nStock reached upper threshold.\nPrice: $" + currentPrice
                 );
+
                 alert.setUpperThresholdEmailSent(true);
                 stockAlertRepository.save(alert);
-                log.info("Upper threshold email sent for stock: {} to user: {}", alert.getSymbol(), user.getUsername());
             }
 
             if (sendLowerEmail) {
                 emailService.sendEmail(
                         user.getEmail(),
                         "Stock Alert: Lower Threshold Reached for " + alert.getSymbol(),
-                        "Dear " + user.getUsername() + ",\n\nThe stock " + alert.getSymbol() + " has fallen to or below your lower threshold of $" + alert.getLowerThreshold() + ". Current price: $" + String.format("%.2f", currentPrice) + ".\n\nBest regards,\nGotStock Team"
+                        "Dear " + user.getUsername() +
+                                ",\n\nStock dropped below threshold.\nPrice: $" + currentPrice
                 );
+
                 alert.setLowerThresholdEmailSent(true);
                 stockAlertRepository.save(alert);
-                log.info("Lower threshold email sent for stock: {} to user: {}", alert.getSymbol(), user.getUsername());
             }
 
-            // Reset flags if price moves back within thresholds
-            if (currentPrice < alert.getUpperThreshold() && alert.isUpperThresholdEmailSent()) {
+            // reset flags
+            if (currentPrice.compareTo(BigDecimal.valueOf(alert.getUpperThreshold())) < 0) {
                 alert.setUpperThresholdEmailSent(false);
-                stockAlertRepository.save(alert);
             }
-            if (currentPrice > alert.getLowerThreshold() && alert.isLowerThresholdEmailSent()) {
+
+            if (currentPrice.compareTo(BigDecimal.valueOf(alert.getLowerThreshold())) > 0) {
                 alert.setLowerThresholdEmailSent(false);
-                stockAlertRepository.save(alert);
             }
-        } catch (MessagingException e) {
-            log.error("Failed to send email for stock alert {} to user {}: {}", alert.getSymbol(), user.getUsername(), e.getMessage());
+
         } catch (Exception e) {
-            log.error("Error checking stock alert for {}: {}", alert.getSymbol(), e.getMessage());
+            log.error("Error checking stock alert: {}", e.getMessage());
         }
     }
 
-
     /**
-     * Calculates the total portfolio value for a user.
-     *
-     * @param userId the ID of the user.
-     * @return the total portfolio value.
+     * Calculates total portfolio value
      */
-    private Double calculatePortfolioValue(Long userId) {
+    private BigDecimal calculatePortfolioValue(Long userId) {
+
         List<StockHolding> holdings = stockHoldingRepository.findByUserId(userId);
-        Double totalValue = 0.0;
+
+        BigDecimal totalValue = BigDecimal.ZERO;
+
         for (StockHolding holding : holdings) {
-            double currentPrice = externalApiService.fetchStockData(holding.getSymbol());
+
+            BigDecimal currentPrice = BigDecimal.valueOf(
+                    externalApiService.fetchStockData(holding.getSymbol())
+            );
+
             holding.setCurrentPrice(currentPrice);
             stockHoldingRepository.save(holding);
-            totalValue += (currentPrice - holding.getPurchasePrice())* holding.getQuantity();
+
+            BigDecimal gain = currentPrice
+                    .subtract(holding.getPurchasePrice())
+                    .multiply(BigDecimal.valueOf(holding.getQuantity()));
+
+            totalValue = totalValue.add(gain);
         }
+
         return totalValue;
     }
 
     /**
-     * Scheduled task to check portfolio value changes every 30 minutes and send email if significant change detected.
+     * Scheduled portfolio monitoring
      */
-    @Scheduled(fixedRate = 1800000) // 1,800,000 milliseconds = 30 minutes
+    @Scheduled(fixedRate = 1800000)
     public void checkPortfolioValueChanges() {
-        log.info("Checking portfolio value changes for all users");
-        List<User> users = userRepository.findAll();
-        for (User user : users) {
-            try {
-                Double currentPortfolioValue = calculatePortfolioValue(user.getId());
-                Double previousPortfolioValue = user.getPreviousPortfolioValue() != null ? user.getPreviousPortfolioValue() : 0.0;
 
-                // Check if portfolio value changed by more than 0%
-                if (previousPortfolioValue != 0.0) {
-                    double changePercentage = Math.abs((currentPortfolioValue - previousPortfolioValue) / previousPortfolioValue * 100);
-                    if (changePercentage >= 0.0) {
-                        String subject = "Portfolio Value Change Alert";
-                        String body = String.format(
-                                "Dear %s,\n\nYour portfolio value has changed significantly. Previous value: $%.2f, Current value: $%.2f (%.2f%% change).\n\nBest regards,\nGotStock Team",
-                                user.getUsername(), previousPortfolioValue, currentPortfolioValue, changePercentage
+        List<User> users = userRepository.findAll();
+
+        for (User user : users) {
+
+            try {
+                BigDecimal currentValue = calculatePortfolioValue(user.getId());
+
+                BigDecimal previousValue = user.getPreviousPortfolioValue() != null
+                        ? BigDecimal.valueOf(user.getPreviousPortfolioValue())
+                        : BigDecimal.ZERO;
+
+                if (previousValue.compareTo(BigDecimal.ZERO) > 0) {
+
+                    BigDecimal change = currentValue.subtract(previousValue);
+
+                    BigDecimal percentage = change
+                            .divide(previousValue, 4, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(100));
+
+                    if (percentage.abs().compareTo(BigDecimal.valueOf(5)) >= 0) {
+
+                        emailService.sendEmail(
+                                user.getEmail(),
+                                "Portfolio Alert",
+                                "Portfolio changed by " + percentage + "%"
                         );
-                        emailService.sendEmail(user.getEmail(), subject, body);
-                        log.info("Portfolio value change email sent to {}: {}% change", user.getEmail(), changePercentage);
                     }
                 }
 
-                // Update previous portfolio value
-                user.setPreviousPortfolioValue(currentPortfolioValue);
+                user.setPreviousPortfolioValue(currentValue.doubleValue());
                 userRepository.save(user);
-            } catch (MessagingException e) {
-                log.error("Failed to send portfolio value change email to {}: {}", user.getEmail(), e.getMessage());
+
             } catch (Exception e) {
-                log.error("Error checking portfolio value for user {}: {}", user.getEmail(), e.getMessage());
+                log.error("Portfolio check error: {}", e.getMessage());
             }
         }
     }

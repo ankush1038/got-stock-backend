@@ -17,6 +17,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -61,11 +62,19 @@ public class PortfolioService {
         holding.setSymbol(stockHoldingDTO.getSymbol());
         holding.setQuantity(stockHoldingDTO.getQuantity());
         holding.setPurchasePrice(stockHoldingDTO.getPurchasePrice());
-        holding.setCurrentPrice(externalApiService.fetchStockData(stockHoldingDTO.getSymbol()));
+
+        // Fetch current price from external API and convert to BigDecimal
+        BigDecimal currentPrice = BigDecimal.valueOf(
+                externalApiService.fetchStockData(stockHoldingDTO.getSymbol())
+        );
+        holding.setCurrentPrice(currentPrice);
 
         // Calculate the gain/loss for the stock holding
-        Double value = stockHoldingDTO.getQuantity() * (externalApiService.fetchStockData(stockHoldingDTO.getSymbol()) - stockHoldingDTO.getPurchasePrice());
-        holding.setGainLoss(value);
+        BigDecimal gain = currentPrice
+                .subtract(stockHoldingDTO.getPurchasePrice())
+                .multiply(BigDecimal.valueOf(stockHoldingDTO.getQuantity()));
+        holding.setGainLoss(gain);
+
         holding.setUser(user);
 
         // Save the stock holding in the repository
@@ -101,11 +110,10 @@ public class PortfolioService {
         Long userId = user.getId();
         List<StockHolding> holdings = stockHoldingRepository.findByUserId(userId);
 
-
         // Calculate the total portfolio value
-        Double totalPortfolioValue = 0.0;
+        BigDecimal totalPortfolioValue = BigDecimal.ZERO;
         for (StockHolding holding : holdings) {
-            totalPortfolioValue += holding.getGainLoss();
+            totalPortfolioValue = totalPortfolioValue.add(holding.getGainLoss());
         }
 
         // Map the stock holdings to DTOs
@@ -189,9 +197,19 @@ public class PortfolioService {
         holding.setSymbol(stockHoldingDTO.getSymbol());
         holding.setQuantity(stockHoldingDTO.getQuantity());
         holding.setPurchasePrice(stockHoldingDTO.getPurchasePrice());
-        holding.setCurrentPrice(externalApiService.fetchStockData(stockHoldingDTO.getSymbol()));
-        Double value = stockHoldingDTO.getQuantity() * (externalApiService.fetchStockData(stockHoldingDTO.getSymbol()) - stockHoldingDTO.getPurchasePrice());
-        holding.setGainLoss(value);
+
+        // Fetch current price from external API
+        BigDecimal currentPrice = BigDecimal.valueOf(
+                externalApiService.fetchStockData(stockHoldingDTO.getSymbol())
+        );
+        holding.setCurrentPrice(currentPrice);
+
+        // Calculate gain/loss
+        BigDecimal gain = currentPrice
+                .subtract(stockHoldingDTO.getPurchasePrice())
+                .multiply(BigDecimal.valueOf(stockHoldingDTO.getQuantity()));
+        holding.setGainLoss(gain);
+
         holding.setUser(user);
 
         // Save the updated stock holding

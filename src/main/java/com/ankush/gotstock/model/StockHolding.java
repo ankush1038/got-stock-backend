@@ -3,6 +3,8 @@ package com.ankush.gotstock.model;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Data
 @Entity
 public class StockHolding {
@@ -15,11 +17,11 @@ public class StockHolding {
 
     private Integer quantity;
 
-    private Double purchasePrice;
+    private BigDecimal purchasePrice;
 
-    private Double currentPrice;
+    private BigDecimal currentPrice;
 
-    private Double gainLoss;
+    private BigDecimal gainLoss;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
