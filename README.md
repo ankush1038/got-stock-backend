@@ -47,6 +47,15 @@ Authorization: Bearer <your_token>
 - EMAIL_PASSWORD
 - API_KEY
 
+## 📸 Screenshots
+
+### Swagger UI
+![Swagger](assets/swagger-ui.png)
+![Swagger](assets/swagger-ui-authorize.png)
+
+### API Response
+![Postman](assets/postman-response.png)
+
 ## 📌 Notes
 - Free instance may take ~30-50 sec on first request
 - Uses in-memory DB if env vars not set (dev mode)
